@@ -1,0 +1,61 @@
+apiVersion: batch.csd.io/v1alpha1
+kind: InstorageJob
+metadata:
+  name: preprocess-llm-offloading-test
+spec:
+  image: ketidevit2/preprocess-llm-offloading-test:v0.1
+  imagePullPolicy: IfNotPresent
+
+  type: preprocess
+
+  # 전처리 위치에 따라 path 앞에 위치가 변경됨
+  dataPath: /data/cnn_dailymail_train
+  outputPath: /output
+
+  # 전처리 파라미터 (docker run 인자에 대응)
+  preprocessing:
+    batchSize: 32
+    nSamples: 10000
+    maxLength: 2048
+    parallelWorkers: 4
+    chunkSize: 100
+
+  # CSD 오프로딩이 아직 필요 없다면 false
+  csd:
+    enabled: false
+
+  # 선택: 데이터 위치 힌트
+  dataLocations:
+    strategy: co-locate
+    locations: ["csd3"]
+
+  # 리소스 (필요시 조절)
+  resources:
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+
+  # 노드 고정(해당 노드에 위 경로가 존재해야 함)
+  nodeScheduling:
+    nodeName: csd-server-01
+
+  # Job 동작
+  jobConfig:
+    completions: 1
+    parallelism: 1
+    backoffLimit: 3
+    ttlSecondsAfterFinished: 3600
+
+  # 로깅/모니터링(옵션)
+  monitoring:
+    enabled: false
+    logLevel: INFO
+
+  # 재시도(옵션)
+  retryPolicy:
+    maxRetries: 3
+    retryInterval: 30
+    exponentialBackoff: true

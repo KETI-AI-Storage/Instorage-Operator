@@ -1,0 +1,47 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# Kubernetes manifests
+deploy/
+config/
+crd/
+
+# Build artifacts
+bin/
+build/
+dist/
+*.exe
+manager
+
+# Test files
+*_test.go
+test/
+tests/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Go test cache
+*.test
+*.out
+coverage.txt
+coverage.html

@@ -1,0 +1,286 @@
+# instorage-crd.yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: instoragejobs.batch.csd.io
+spec:
+  group: batch.csd.io
+  scope: Cluster
+  names:
+    plural: instoragejobs
+    singular: instoragejob
+    kind: InstorageJob
+    shortNames:
+    - isj
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+            - type
+            - dataPath
+            - outputPath
+            - image
+            properties:
+              # 작업 유형 설정
+              type:
+                type: string
+                enum: ["preprocess", "inference", "training"]
+                description: "job type: preprocess, inference, or training"
+              # 기본 작업 설정
+              dataPath:
+                type: string
+                description: "input data path"
+              outputPath:
+                type: string
+                description: "output data path"
+              image:
+                type: string
+                description: "container image"
+              imagePullPolicy:
+                type: string
+                enum: ["Always", "IfNotPresent", "Never"]
+                default: "Always"
+              
+              # CSD 관련 설정
+              csd:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                    description: "csd offloading"
+                  devicePath:
+                    type: string
+                    description: "csd device path"
+                  offloadingRatio:
+                    type: object
+                    default: { request: 0.8, limit: 0.8 }
+                    properties:
+                      request: { type: number, minimum: 0, maximum: 1, default: 0.8 }
+                      limit:   { type: number, minimum: 0, maximum: 1, default: 0.8 }
+                    required: ["request", "limit"]
+                    x-kubernetes-validations:
+                      - rule: "self.request <= self.limit"
+                        message: "it must be (request ≤ limit)"
+              
+              # 분산 저장 위치 힌트
+              dataLocations:
+                type: object
+                properties:
+                  strategy:
+                    type: string
+                    enum: ["co-locate", "fan-out", "replicated"]
+                    default: "co-locate"
+                    description: |
+                      co-locate: 가능한 한 같은 위치(CSD)로 작업을 붙임
+                      fan-out: 여러 위치로 분산 읽기
+                      replicated: 동일 데이터를 여러 위치에서 읽을 수 있다고 가정
+                  locations:
+                    type: array
+                    minItems: 1
+                    description: "데이터가 존재하는 CSD ID 집합"
+                    items:
+                      type: string
+                      pattern: "^csd[0-9]+$"     # 예: csd1, csd2, csd3...
+                  weights:
+                    type: array
+                    description: "선택적 가중치(전략이 fan-out일 때 유용)"
+                    items:
+                      type: object
+                      required: ["location", "weight"]
+                      properties:
+                        location:
+                          type: string
+                          pattern: "^csd[0-9]+$"
+                        weight:
+                          type: integer
+                          minimum: 1
+                          maximum: 100
+                x-kubernetes-validations:
+                  - rule: "!has(self.weights) || (size(self.weights) == size(self.locations))"
+                    message: "weights 개수는 locations 개수와 일치해야 합니다."
+              
+              # 전처리 파라미터
+              preprocessing:
+                type: object
+                properties:
+                  batchSize:
+                    type: integer
+                    default: 64
+                    minimum: 1
+                  maxLength:
+                    type: integer
+                    default: 2048
+                  nSamples:
+                    type: integer
+                    default: 5000
+                  parallelWorkers:
+                    type: integer
+                    default: 4
+                    minimum: 1
+                  chunkSize:
+                    type: integer
+                    description: "data chunk size (MB)"
+                    default: 100
+              
+              # 리소스 요구사항
+              resources:
+                type: object
+                properties:
+                  requests:
+                    type: object
+                    properties:
+                      cpu:
+                        type: string
+                        default: "2"
+                      memory:
+                        type: string
+                        default: "4Gi"
+                      gpu:
+                        type: string
+                  limits:
+                    type: object
+                    properties:
+                      cpu:
+                        type: string
+                        default: "4"
+                      memory:
+                        type: string
+                        default: "8Gi"
+                      gpu:
+                        type: string
+              
+              # 노드 스케줄링
+              nodeScheduling:
+                type: object
+                properties:
+                  nodeName:
+                    type: string
+                    description: "select particular node"
+                  nodeSelector:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  affinity:
+                    type: object
+                    description: "node affinity"
+              
+              # Job 설정
+              jobConfig:
+                type: object
+                properties:
+                  completions:
+                    type: integer
+                    default: 1
+                    minimum: 1
+                  parallelism:
+                    type: integer
+                    default: 1
+                    minimum: 1
+                  backoffLimit:
+                    type: integer
+                    default: 3
+                    minimum: 0
+                  ttlSecondsAfterFinished:
+                    type: integer
+                    default: 3600
+                    minimum: 0
+                  activeDeadlineSeconds:
+                    type: integer
+                    description: "max job execution time"
+              
+              # 모니터링 및 로깅
+              monitoring:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                  metricsPort:
+                    type: integer
+                    default: 9090
+                  logLevel:
+                    type: string
+                    enum: ["DEBUG", "INFO", "WARNING", "ERROR"]
+                    default: "INFO"
+                  prometheusLabels:
+                    type: object
+                    additionalProperties:
+                      type: string
+              
+              # 재시도 정책
+              retryPolicy:
+                type: object
+                properties:
+                  maxRetries:
+                    type: integer
+                    default: 3
+                  retryInterval:
+                    type: integer
+                    default: 30
+                    description: "retry interval (sec)"
+                  exponentialBackoff:
+                    type: boolean
+                    default: true
+              
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                enum: ["Pending", "Running", "Succeeded", "Failed", "Unknown"]
+              startTime:
+                type: string
+              completionTime:
+                type: string
+              processedRecords:
+                type: integer
+              totalRecords:
+                type: integer
+              csdUtilization:
+                type: number
+              message:
+                type: string
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Type
+      type: string
+      jsonPath: .spec.type
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: CSD
+      type: boolean
+      jsonPath: .spec.csd.enabled
+    - name: Progress
+      type: string
+      jsonPath: .status.processedRecords
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    - name: Locs
+      type: string
+      jsonPath: .spec.dataLocations.locations
