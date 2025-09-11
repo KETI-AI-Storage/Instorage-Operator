@@ -7,6 +7,37 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+var (
+	// SchemeGroupVersion is group version used to register these objects
+	SchemeGroupVersion = schema.GroupVersion{Group: "batch.csd.io", Version: "v1alpha1"}
+
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
+)
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// InstorageJob is the Schema for the instoragejobs API
+type InstorageJob struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              InstorageJobSpec   `json:"spec,omitempty"`
+	Status            InstorageJobStatus `json:"status,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// InstorageJobList contains a list of InstorageJob
+type InstorageJobList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []InstorageJob `json:"items"`
+}
+
 // InstorageJobSpec defines the desired state of InstorageJob
 type InstorageJobSpec struct {
 	DataPath        string               `json:"dataPath"`
@@ -51,11 +82,61 @@ type LocationWeight struct {
 
 // PreprocessingConfig defines preprocessing parameters
 type PreprocessingConfig struct {
-	BatchSize       int `json:"batchSize,omitempty"`
-	MaxLength       int `json:"maxLength,omitempty"`
-	NSamples        int `json:"nSamples,omitempty"`
-	ParallelWorkers int `json:"parallelWorkers,omitempty"`
-	ChunkSize       int `json:"chunkSize,omitempty"`
+	BatchSize        int             `json:"batchSize,omitempty"`
+	MaxLength        int             `json:"maxLength,omitempty"`
+	NSamples         int             `json:"nSamples,omitempty"`
+	ParallelWorkers  int             `json:"parallelWorkers,omitempty"`
+	ChunkSize        int             `json:"chunkSize,omitempty"`
+	BatchStrategy    string          `json:"batchStrategy,omitempty"`
+	BatchExecution   *BatchExecution `json:"batchExecution,omitempty"`
+	ChunkingStrategy string          `json:"chunkingStrategy,omitempty"`
+	DataDiscovery    *DataDiscovery  `json:"dataDiscovery,omitempty"`
+	DynamicScaling   *DynamicScaling `json:"dynamicScaling,omitempty"`
+	Optimization     *Optimization   `json:"optimization,omitempty"`
+}
+
+// BatchExecution defines batch execution parameters
+type BatchExecution struct {
+	MaxBatchSize        int `json:"maxBatchSize,omitempty"`
+	MaxParallelJobs     int `json:"maxParallelJobs,omitempty"`
+	MinParallelJobs     int `json:"minParallelJobs,omitempty"`
+	TargetBatchDuration int `json:"targetBatchDuration,omitempty"`
+	BatchTimeout        int `json:"batchTimeout,omitempty"`
+}
+
+// DataDiscovery defines data discovery parameters
+type DataDiscovery struct {
+	Enabled          bool              `json:"enabled,omitempty"`
+	SampleSize       int               `json:"sampleSize,omitempty"`
+	SampleRatio      float64           `json:"sampleRatio,omitempty"`
+	MaxScanDepth     int               `json:"maxScanDepth,omitempty"`
+	FileExtensions   []string          `json:"fileExtensions,omitempty"`
+	ExcludePatterns  []string          `json:"excludePatterns,omitempty"`
+	UserProvidedData *UserProvidedData `json:"userProvidedData,omitempty"`
+}
+
+// UserProvidedData defines user-provided data analysis information
+type UserProvidedData struct {
+	TotalFiles     int            `json:"totalFiles"`
+	TotalSizeBytes int64          `json:"totalSizeBytes"`
+	AvgFileSize    int64          `json:"avgFileSize"`
+	FileTypes      map[string]int `json:"fileTypes,omitempty"`
+}
+
+// DynamicScaling defines dynamic scaling parameters
+type DynamicScaling struct {
+	Enabled            bool    `json:"enabled,omitempty"`
+	ScaleUpThreshold   float64 `json:"scaleUpThreshold,omitempty"`
+	ScaleDownThreshold float64 `json:"scaleDownThreshold,omitempty"`
+	CooldownPeriod     int     `json:"cooldownPeriod,omitempty"`
+}
+
+// Optimization defines performance optimization parameters
+type Optimization struct {
+	EnableCaching     bool   `json:"enableCaching,omitempty"`
+	CacheSize         string `json:"cacheSize,omitempty"`
+	EnableCompression bool   `json:"enableCompression,omitempty"`
+	IoOptimization    string `json:"ioOptimization,omitempty"`
 }
 
 // ResourceConfig defines resource requirements
@@ -104,15 +185,49 @@ type RetryPolicy struct {
 
 // InstorageJobStatus defines the observed state of InstorageJob
 type InstorageJobStatus struct {
-	Phase            JobPhase       `json:"phase,omitempty"`
-	StartTime        *metav1.Time   `json:"startTime,omitempty"`
-	CompletionTime   *metav1.Time   `json:"completionTime,omitempty"`
-	ProcessedRecords int            `json:"processedRecords,omitempty"`
-	TotalRecords     int            `json:"totalRecords,omitempty"`
-	CSDUtilization   float64        `json:"csdUtilization,omitempty"`
-	Message          string         `json:"message,omitempty"`
-	TargetNode       string         `json:"targetNode,omitempty"`
-	Conditions       []JobCondition `json:"conditions,omitempty"`
+	Phase            JobPhase              `json:"phase,omitempty"`
+	StartTime        *metav1.Time          `json:"startTime,omitempty"`
+	CompletionTime   *metav1.Time          `json:"completionTime,omitempty"`
+	ProcessedRecords int                   `json:"processedRecords,omitempty"`
+	TotalRecords     int                   `json:"totalRecords,omitempty"`
+	CSDUtilization   float64               `json:"csdUtilization,omitempty"`
+	Message          string                `json:"message,omitempty"`
+	TargetNode       string                `json:"targetNode,omitempty"`
+	BatchExecution   *BatchExecutionStatus `json:"batchExecution,omitempty"`
+	DataAnalysis     *DataAnalysisResult   `json:"dataAnalysis,omitempty"`
+	Conditions       []JobCondition        `json:"conditions,omitempty"`
+}
+
+// BatchExecutionStatus defines batch execution status
+type BatchExecutionStatus struct {
+	TotalBatches         int           `json:"totalBatches,omitempty"`
+	CompletedBatches     int           `json:"completedBatches,omitempty"`
+	FailedBatches        int           `json:"failedBatches,omitempty"`
+	RunningBatches       int           `json:"runningBatches,omitempty"`
+	ActiveBatches        []BatchStatus `json:"activeBatches,omitempty"`
+	BatchStrategy        string        `json:"batchStrategy,omitempty"`
+	AverageBatchDuration int           `json:"averageBatchDuration,omitempty"`
+	EstimatedCompletion  *metav1.Time  `json:"estimatedCompletion,omitempty"`
+}
+
+// BatchStatus defines individual batch status
+type BatchStatus struct {
+	BatchId        string       `json:"batchId,omitempty"`
+	Status         string       `json:"status,omitempty"`
+	StartTime      *metav1.Time `json:"startTime,omitempty"`
+	ItemCount      int          `json:"itemCount,omitempty"`
+	ProcessedItems int          `json:"processedItems,omitempty"`
+	Message        string       `json:"message,omitempty"`
+}
+
+// DataAnalysisResult defines data analysis result
+type DataAnalysisResult struct {
+	TotalFiles     int            `json:"totalFiles,omitempty"`
+	TotalSizeBytes int64          `json:"totalSizeBytes,omitempty"`
+	AvgFileSize    int64          `json:"avgFileSize,omitempty"`
+	FileTypes      map[string]int `json:"fileTypes,omitempty"`
+	DiscoveryTime  *metav1.Time   `json:"discoveryTime,omitempty"`
+	SampledFiles   int            `json:"sampledFiles,omitempty"`
 }
 
 // JobCondition defines job condition
@@ -132,37 +247,6 @@ const (
 	JobPhaseSucceeded JobPhase = "Succeeded"
 	JobPhaseFailed    JobPhase = "Failed"
 	JobPhaseUnknown   JobPhase = "Unknown"
-)
-
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// InstorageJob is the Schema for the instoragejobs API
-type InstorageJob struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              InstorageJobSpec   `json:"spec,omitempty"`
-	Status            InstorageJobStatus `json:"status,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// InstorageJobList contains a list of InstorageJob
-type InstorageJobList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []InstorageJob `json:"items"`
-}
-
-var (
-	// SchemeGroupVersion is group version used to register these objects
-	SchemeGroupVersion = schema.GroupVersion{Group: "batch.csd.io", Version: "v1alpha1"}
-
-	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-
-	// AddToScheme adds the types in this group-version to the given scheme.
-	AddToScheme = SchemeBuilder.AddToScheme
 )
 
 // DeepCopyObject returns a generically typed copy of an object
@@ -240,7 +324,7 @@ func (in *InstorageJobSpec) DeepCopyInto(out *InstorageJobSpec) {
 	if in.Preprocessing != nil {
 		in, out := &in.Preprocessing, &out.Preprocessing
 		*out = new(PreprocessingConfig)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
@@ -377,6 +461,93 @@ func (in *MonitoringConfig) DeepCopyInto(out *MonitoringConfig) {
 func (in *JobCondition) DeepCopyInto(out *JobCondition) {
 	*out = *in
 	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PreprocessingConfig) DeepCopyInto(out *PreprocessingConfig) {
+	*out = *in
+	if in.BatchExecution != nil {
+		in, out := &in.BatchExecution, &out.BatchExecution
+		*out = new(BatchExecution)
+		**out = **in
+	}
+	if in.DataDiscovery != nil {
+		in, out := &in.DataDiscovery, &out.DataDiscovery
+		*out = new(DataDiscovery)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.DynamicScaling != nil {
+		in, out := &in.DynamicScaling, &out.DynamicScaling
+		*out = new(DynamicScaling)
+		**out = **in
+	}
+	if in.Optimization != nil {
+		in, out := &in.Optimization, &out.Optimization
+		*out = new(Optimization)
+		**out = **in
+	}
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PreprocessingConfig.
+func (in *PreprocessingConfig) DeepCopy() *PreprocessingConfig {
+	if in == nil {
+		return nil
+	}
+	out := new(PreprocessingConfig)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DataDiscovery) DeepCopyInto(out *DataDiscovery) {
+	*out = *in
+	if in.FileExtensions != nil {
+		in, out := &in.FileExtensions, &out.FileExtensions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ExcludePatterns != nil {
+		in, out := &in.ExcludePatterns, &out.ExcludePatterns
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.UserProvidedData != nil {
+		in, out := &in.UserProvidedData, &out.UserProvidedData
+		*out = new(UserProvidedData)
+		(*in).DeepCopyInto(*out)
+	}
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new DataDiscovery.
+func (in *DataDiscovery) DeepCopy() *DataDiscovery {
+	if in == nil {
+		return nil
+	}
+	out := new(DataDiscovery)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *UserProvidedData) DeepCopyInto(out *UserProvidedData) {
+	*out = *in
+	if in.FileTypes != nil {
+		in, out := &in.FileTypes, &out.FileTypes
+		*out = make(map[string]int, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new UserProvidedData.
+func (in *UserProvidedData) DeepCopy() *UserProvidedData {
+	if in == nil {
+		return nil
+	}
+	out := new(UserProvidedData)
+	in.DeepCopyInto(out)
+	return out
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {

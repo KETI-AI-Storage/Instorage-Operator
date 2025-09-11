@@ -1,5 +1,5 @@
 registry="ketidevit2"
-image_name="instorage-preprocess-operator"
+image_name="instorage-operator"
 version="v0.0.1"
 dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 

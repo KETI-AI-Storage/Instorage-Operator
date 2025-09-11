@@ -129,6 +129,178 @@ spec:
                     type: integer
                     description: "data chunk size (MB)"
                     default: 100
+                  # 배치 처리 전략
+                  batchStrategy:
+                    type: string
+                    enum: ["none", "auto", "manual", "size-based", "count-based", "memory-based"]
+                    default: "none"
+                    description: |
+                      node: 배치 처리 하지 않음(일괄처리)
+                      auto: 자동 최적화 배치 계획
+                      manual: 사용자 직접 지정
+                      size-based: 파일 크기 기준 분할
+                      count-based: 파일 개수 기준 분할
+                      memory-based: 메모리 사용량 기준 분할
+                  # 배치 실행 설정
+                  batchExecution:
+                    type: object
+                    properties:
+                      maxBatchSize:
+                        type: integer
+                        default: 1000
+                        minimum: 1
+                        maximum: 100000
+                        description: "배치당 최대 아이템 수 (파일, 레코드 등)"
+                      maxParallelJobs:
+                        type: integer
+                        default: 10
+                        minimum: 1
+                        maximum: 100
+                        description: "최대 동시 실행 Job 수"
+                      minParallelJobs:
+                        type: integer
+                        default: 1
+                        minimum: 1
+                        description: "최소 병렬 Job 수"
+                      targetBatchDuration:
+                        type: integer
+                        default: 300
+                        minimum: 60
+                        maximum: 3600
+                        description: "목표 배치 실행 시간 (초)"
+                      batchTimeout:
+                        type: integer
+                        default: 1800
+                        minimum: 300
+                        description: "배치 타임아웃 (초)"
+                    x-kubernetes-validations:
+                      - rule: "self.minParallelJobs <= self.maxParallelJobs"
+                        message: "minParallelJobs must be <= maxParallelJobs"
+                  # 청킹 전략
+                  chunkingStrategy:
+                    type: string
+                    enum: ["round-robin", "size-balanced", "locality-aware", "hash-based", "sequential"]
+                    default: "round-robin"
+                    description: |
+                      round-robin: 파일을 순서대로 배치에 분배
+                      size-balanced: 각 배치의 데이터 크기가 균등하도록 분배
+                      locality-aware: 데이터 위치 기준 분배 (CSD 노드별)
+                      hash-based: 파일명 해시 기준 분배
+                      sequential: 연속된 파일들을 같은 배치에 배치
+                  # 데이터 탐색 설정
+                  dataDiscovery:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        default: true
+                        description: "자동 데이터셋 분석 활성화"
+                      sampleSize:
+                        type: integer
+                        default: 1000
+                        minimum: 10
+                        maximum: 10000
+                        description: "분석용 샘플 데이터 개수"
+                      sampleRatio:
+                        type: number
+                        default: 0.01
+                        minimum: 0.001
+                        maximum: 1.0
+                        description: "전체 데이터 중 샘플링 비율"
+                      maxScanDepth:
+                        type: integer
+                        default: 3
+                        minimum: 1
+                        maximum: 10
+                        description: "디렉토리 스캔 최대 깊이"
+                      fileExtensions:
+                        type: array
+                        description: "처리할 파일 확장자 필터"
+                        items:
+                          type: string
+                          pattern: "^\\.[a-zA-Z0-9]+$"
+                        example: [".txt", ".json", ".csv"]
+                      excludePatterns:
+                        type: array
+                        description: "제외할 파일 패턴"
+                        items:
+                          type: string
+                        example: ["*.tmp", ".*", "*.log"]
+                      # 사용자 제공 데이터 정보 (자동 스캔 대신 임시로 사용)
+                      userProvidedData:
+                        type: object
+                        description: "사용자가 미리 제공하는 데이터 분석 정보"
+                        properties:
+                          totalFiles:
+                            type: integer
+                            minimum: 1
+                            description: "전체 파일 개수"
+                          totalSizeBytes:
+                            type: integer
+                            minimum: 1
+                            description: "전체 데이터 크기 (바이트)"
+                          avgFileSize:
+                            type: integer
+                            minimum: 1
+                            description: "평균 파일 크기 (바이트)"
+                          fileTypes:
+                            type: object
+                            description: "파일 타입별 개수"
+                            additionalProperties:
+                              type: integer
+                              minimum: 0
+                            example: 
+                              ".arrow": 3
+                              ".txt": 1000
+                  # 동적 스케일링
+                  dynamicScaling:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        default: false
+                        description: "동적 스케일링 활성화"
+                      scaleUpThreshold:
+                        type: number
+                        default: 0.8
+                        minimum: 0.1
+                        maximum: 1.0
+                        description: "스케일업 임계치 (리소스 사용률)"
+                      scaleDownThreshold:
+                        type: number
+                        default: 0.3
+                        minimum: 0.1
+                        maximum: 1.0
+                        description: "스케일다운 임계치 (리소스 사용률)"
+                      cooldownPeriod:
+                        type: integer
+                        default: 300
+                        minimum: 60
+                        description: "스케일링 쿨다운 시간 (초)"
+                    x-kubernetes-validations:
+                      - rule: "self.scaleDownThreshold < self.scaleUpThreshold"
+                        message: "scaleDownThreshold must be < scaleUpThreshold"
+                  # 성능 최적화
+                  optimization:
+                    type: object
+                    properties:
+                      enableCaching:
+                        type: boolean
+                        default: true
+                        description: "중간 결과 캐싱 활성화"
+                      cacheSize:
+                        type: string
+                        default: "1Gi"
+                        description: "캐시 크기"
+                      enableCompression:
+                        type: boolean
+                        default: false
+                        description: "데이터 압축 활성화"
+                      ioOptimization:
+                        type: string
+                        enum: ["none", "sequential", "random", "mixed"]
+                        default: "sequential"
+                        description: "I/O 최적화 모드"
               
               # 리소스 요구사항
               resources:
@@ -248,6 +420,66 @@ spec:
                 type: number
               message:
                 type: string
+              # 배치 실행 상태
+              batchExecution:
+                type: object
+                properties:
+                  totalBatches:
+                    type: integer
+                    description: "총 배치 수"
+                  completedBatches:
+                    type: integer
+                    description: "완료된 배치 수"
+                  failedBatches:
+                    type: integer
+                    description: "실패한 배치 수"
+                  runningBatches:
+                    type: integer
+                    description: "실행 중인 배치 수"
+                  activeBatches:
+                    type: array
+                    description: "현재 활성 배치 목록"
+                    items:
+                      type: object
+                      properties:
+                        batchId:
+                          type: string
+                        status:
+                          type: string
+                          enum: ["Pending", "Running", "Completed", "Failed"]
+                        startTime:
+                          type: string
+                        itemCount:
+                          type: integer
+                        processedItems:
+                          type: integer
+                  batchStrategy:
+                    type: string
+                    description: "사용된 배치 전략"
+                  averageBatchDuration:
+                    type: integer
+                    description: "평균 배치 실행 시간 (초)"
+                  estimatedCompletion:
+                    type: string
+                    description: "예상 완료 시간"
+              # 데이터 분석 결과
+              dataAnalysis:
+                type: object
+                properties:
+                  totalFiles:
+                    type: integer
+                  totalSizeBytes:
+                    type: integer
+                  avgFileSize:
+                    type: integer
+                  fileTypes:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  discoveryTime:
+                    type: string
+                  sampledFiles:
+                    type: integer
               conditions:
                 type: array
                 items:
