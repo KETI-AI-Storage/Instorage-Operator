@@ -2,6 +2,7 @@ apiVersion: batch.csd.io/v1alpha1
 kind: InstorageJob
 metadata:
   name: preprocess-llm-offloading-test
+  namespace: test
 spec:
   image: ketidevit2/preprocess-llm-offloading-test:v0.1
   imagePullPolicy: IfNotPresent
@@ -22,7 +23,7 @@ spec:
 
   # CSD 오프로딩이 아직 필요 없다면 false
   csd:
-    enabled: false
+    enabled: true
 
   # 선택: 데이터 위치 힌트
   dataLocations:

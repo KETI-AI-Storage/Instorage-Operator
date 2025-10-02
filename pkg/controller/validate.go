@@ -19,11 +19,12 @@ func (r *InstorageJobReconciler) validateJobSpec(job *instoragev1alpha1.Instorag
 	if job.Name == "" {
 		return fmt.Errorf("job name is required")
 	}
-	if job.Namespace == "" {
-		return fmt.Errorf("job namespace is required")
-	}
+	// Note: InstorageJob is cluster-scoped, so no namespace validation needed
 
 	// Validate required job spec fields
+	if job.Spec.Type == "" {
+		return fmt.Errorf("job type is required")
+	}
 	if job.Spec.Image == "" {
 		return fmt.Errorf("container image is required")
 	}
@@ -32,6 +33,16 @@ func (r *InstorageJobReconciler) validateJobSpec(job *instoragev1alpha1.Instorag
 	}
 	if job.Spec.OutputPath == "" {
 		return fmt.Errorf("outputPath is required")
+	}
+
+	// Validate job type
+	validTypes := map[string]bool{
+		"preprocess": true,
+		"inference":  true,
+		"training":   true,
+	}
+	if !validTypes[job.Spec.Type] {
+		return fmt.Errorf("invalid job type '%s', must be one of: preprocess, inference, training", job.Spec.Type)
 	}
 
 	// Validate image format (basic check)
@@ -205,23 +216,24 @@ func (r *InstorageJobReconciler) validateDataLocations(config *instoragev1alpha1
 	}
 
 	validStrategies := map[string]bool{
-		"round-robin": true,
-		"random":      true,
-		"first-fit":   true,
-		"best-fit":    true,
+		"co-locate":   true,
+		"fan-out":     true,
+		"replicated":  true,
 	}
 
 	if config.Strategy != "" && !validStrategies[config.Strategy] {
-		return fmt.Errorf("invalid strategy '%s', must be one of: round-robin, random, first-fit, best-fit", config.Strategy)
+		return fmt.Errorf("invalid strategy '%s', must be one of: co-locate, fan-out, replicated", config.Strategy)
 	}
 
-	// Validate each location path
+	// Validate each location ID (should match pattern: csd[0-9]+)
 	for i, location := range config.Locations {
 		if location == "" {
 			return fmt.Errorf("data location at index %d cannot be empty", i)
 		}
-		if !filepath.IsAbs(location) {
-			return fmt.Errorf("data location at index %d must be an absolute path: %s", i, location)
+		// Validate CSD ID format
+		matched, _ := regexp.MatchString("^csd[0-9]+$", location)
+		if !matched {
+			return fmt.Errorf("data location at index %d must be a valid CSD ID (e.g., csd1, csd2): %s", i, location)
 		}
 	}
 
@@ -230,10 +242,7 @@ func (r *InstorageJobReconciler) validateDataLocations(config *instoragev1alpha1
 
 // validateCSDConfig validates CSD configuration
 func (r *InstorageJobReconciler) validateCSDConfig(config *instoragev1alpha1.CSDConfig) error {
-	if config.Enabled && config.DevicePath == "" {
-		return fmt.Errorf("devicePath is required when CSD is enabled")
-	}
-
+	// devicePath is optional, only validate if provided
 	if config.DevicePath != "" {
 		if !filepath.IsAbs(config.DevicePath) {
 			return fmt.Errorf("devicePath must be an absolute path: %s", config.DevicePath)

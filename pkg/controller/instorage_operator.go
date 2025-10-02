@@ -147,6 +147,7 @@ func (r *InstorageJobReconciler) handlePendingJob(ctx context.Context, job *inst
 	r.Log.Info("Handling pending job", "job", job.Name)
 
 	if err := r.validateJobSpec(job); err != nil {
+		r.Log.Error(err, "Job validation failed", "job", job.Name)
 		job.Status.Phase = instoragev1alpha1.JobPhaseFailed
 		job.Status.Message = fmt.Sprintf("Validation failed: %v", err)
 		return ctrl.Result{}, r.Status().Update(ctx, job)

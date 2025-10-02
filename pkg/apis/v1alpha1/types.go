@@ -40,6 +40,7 @@ type InstorageJobList struct {
 
 // InstorageJobSpec defines the desired state of InstorageJob
 type InstorageJobSpec struct {
+	Type            string               `json:"type"`
 	DataPath        string               `json:"dataPath"`
 	OutputPath      string               `json:"outputPath"`
 	Image           string               `json:"image"`

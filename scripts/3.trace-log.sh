@@ -1,7 +1,7 @@
 #!/bin/bash
 
-NAMESPACE=orchestration
-COMPONENT=instorage-preprocess-operator
+NAMESPACE=instorage-system
+COMPONENT=instorage-operator
 
 while [ -z "$PODNAME" ]
 do

@@ -3,9 +3,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
+
 	instoragev1alpha1 "instorage-operator/pkg/apis/v1alpha1"
 	pb "instorage-operator/pkg/proto"
-	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -17,13 +19,49 @@ import (
 // 1. performDataDiscovery : 데이터 분석 과정 구현 필요, 현재 Mock Data
 // 2. optimizeBatchConfiguration + optimizeBatchConfiguration : 최적 배치 전략 개선 필요
 
+// Path prefixes based on CSD enabled status
+const (
+	CSDEnabledPathPrefix  = "/home/ngd/storage"
+	CSDDisabledPathPrefix = "/mnt"
+)
+
+// buildStoragePath builds the full storage path based on CSD configuration
+func (r *InstorageJobReconciler) buildStoragePath(originalPath string, csdEnabled bool) string {
+	// If path is already absolute and contains the expected prefix, return as-is
+	if filepath.IsAbs(originalPath) {
+		if csdEnabled && strings.HasPrefix(originalPath, CSDEnabledPathPrefix) {
+			return originalPath
+		}
+		if !csdEnabled && strings.HasPrefix(originalPath, CSDDisabledPathPrefix) {
+			return originalPath
+		}
+	}
+	
+	// Add appropriate prefix
+	prefix := CSDDisabledPathPrefix
+	if csdEnabled {
+		prefix = CSDEnabledPathPrefix
+	}
+	
+	// Clean the original path to remove leading slash if present
+	cleanPath := strings.TrimPrefix(originalPath, "/")
+	
+	return filepath.Join(prefix, cleanPath)
+}
+
 func (r *InstorageJobReconciler) createKubernetesJob(ctx context.Context, job *instoragev1alpha1.InstorageJob) (*batchv1.Job, error) {
 	jobSpec := r.buildJobSpec(job)
+
+	// Use default namespace for cluster-scoped InstorageJob
+	namespace := job.Namespace
+	if namespace == "" {
+		namespace = "default"
+	}
 
 	k8sJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      job.Name,
-			Namespace: job.Namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":       "instorage-job",
 				"app.kubernetes.io/instance":   job.Name,
@@ -100,8 +138,10 @@ func (r *InstorageJobReconciler) buildContainer(job *instoragev1alpha1.Instorage
 		container.ImagePullPolicy = job.Spec.ImagePullPolicy
 	}
 
-	dataPath := "/mnt" + job.Spec.DataPath
-	outputPath := "/mnt" + job.Spec.OutputPath
+	// Determine if CSD is enabled and build appropriate paths
+	csdEnabled := job.Spec.CSD != nil && job.Spec.CSD.Enabled
+	dataPath := r.buildStoragePath(job.Spec.DataPath, csdEnabled)
+	outputPath := r.buildStoragePath(job.Spec.OutputPath, csdEnabled)
 
 	env := []corev1.EnvVar{
 		{
@@ -449,14 +489,21 @@ func (r *InstorageJobReconciler) buildBatchContainer(parentJob *instoragev1alpha
 
 // Build gRPC submit job request from InstorageJob spec
 func (r *InstorageJobReconciler) buildSubmitJobRequest(job *instoragev1alpha1.InstorageJob, nodeName string) *pb.SubmitJobRequest {
+	// Determine if CSD is enabled
+	csdEnabled := job.Spec.CSD != nil && job.Spec.CSD.Enabled
+	
+	// Build storage paths with appropriate prefixes
+	dataPath := r.buildStoragePath(job.Spec.DataPath, csdEnabled)
+	outputPath := r.buildStoragePath(job.Spec.OutputPath, csdEnabled)
+	
 	request := &pb.SubmitJobRequest{
 		JobId:           string(job.UID),
 		JobName:         job.Name,
 		Namespace:       job.Namespace,
 		Image:           job.Spec.Image,
 		ImagePullPolicy: string(job.Spec.ImagePullPolicy),
-		DataPath:        job.Spec.DataPath,
-		OutputPath:      job.Spec.OutputPath,
+		DataPath:        dataPath,
+		OutputPath:      outputPath,
 		TargetNode:      nodeName,
 		Labels:          job.Labels,
 		Annotations:     job.Annotations,

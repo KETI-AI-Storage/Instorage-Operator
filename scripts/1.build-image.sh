@@ -1,10 +1,10 @@
 registry="ketidevit2"
 image_name="instorage-operator"
-version="v0.0.1"
+version="v0.0.8"
 dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-# build binary file
-go build -o "$dir/../build/_output/bin/$image_name" -mod=vendor "$dir/../cmd/main.go"
+# build binary file with static linking for Alpine
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags '-extldflags "-static"' -o "$dir/../build/_output/bin/$image_name" -mod=vendor "$dir/../cmd/main.go"
 
 # make image (Dockerfile must be in build/)
 docker build -t $image_name:$version "$dir/../build"
