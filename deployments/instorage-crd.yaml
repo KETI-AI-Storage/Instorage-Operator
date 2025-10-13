@@ -5,7 +5,7 @@ metadata:
   name: instoragejobs.batch.csd.io
 spec:
   group: batch.csd.io
-  scope: Cluster
+  scope: Namespaced
   names:
     plural: instoragejobs
     singular: instoragejob
@@ -48,7 +48,7 @@ spec:
                 enum: ["Always", "IfNotPresent", "Never"]
                 default: "Always"
               
-              # CSD 관련 설정
+              # CSD 관련 설정 (offloadingRatio 제거)
               csd:
                 type: object
                 properties:
@@ -56,21 +56,18 @@ spec:
                     type: boolean
                     default: false
                     description: "csd offloading"
-                  devicePath:
-                    type: string
-                    description: "csd device path"
-                  offloadingRatio:
-                    type: object
-                    default: { request: 0.8, limit: 0.8 }
-                    properties:
-                      request: { type: number, minimum: 0, maximum: 1, default: 0.8 }
-                      limit:   { type: number, minimum: 0, maximum: 1, default: 0.8 }
-                    required: ["request", "limit"]
-                    x-kubernetes-validations:
-                      - rule: "self.request <= self.limit"
-                        message: "it must be (request ≤ limit)"
+                  # offloadingRatio:
+                  #   type: object
+                  #   default: { request: 0.8, limit: 0.8 }
+                  #   properties:
+                  #     request: { type: number, minimum: 0, maximum: 1, default: 0.8 }
+                  #     limit:   { type: number, minimum: 0, maximum: 1, default: 0.8 }
+                  #   required: ["request", "limit"]
+                  #   x-kubernetes-validations:
+                  #     - rule: "self.request <= self.limit"
+                  #       message: "it must be (request ≤ limit)"
               
-              # 분산 저장 위치 힌트
+              # 분산 저장 위치 힌트 (fan-out의 weight 제거)
               dataLocations:
                 type: object
                 properties:
@@ -89,23 +86,6 @@ spec:
                     items:
                       type: string
                       pattern: "^csd[0-9]+$"     # 예: csd1, csd2, csd3...
-                  weights:
-                    type: array
-                    description: "선택적 가중치(전략이 fan-out일 때 유용)"
-                    items:
-                      type: object
-                      required: ["location", "weight"]
-                      properties:
-                        location:
-                          type: string
-                          pattern: "^csd[0-9]+$"
-                        weight:
-                          type: integer
-                          minimum: 1
-                          maximum: 100
-                x-kubernetes-validations:
-                  - rule: "!has(self.weights) || (size(self.weights) == size(self.locations))"
-                    message: "weights 개수는 locations 개수와 일치해야 합니다."
               
               # 전처리 파라미터
               preprocessing:
