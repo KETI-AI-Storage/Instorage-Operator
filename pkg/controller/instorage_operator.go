@@ -23,7 +23,7 @@ import (
 
 const (
 	InstorageJobFinalizer       = "instorage.batch.csd.io/finalizer"
-	DefaultInstorageManagerPort = "50051"
+	DefaultInstorageManagerPort = "40110"
 
 	// Requeue intervals (seconds)
 	DefaultRequeueInterval = 10
@@ -357,7 +357,8 @@ func (r *InstorageJobReconciler) submitToInstorageManager(ctx context.Context, n
 	}
 
 	// Build gRPC server address
-	serverAddr := fmt.Sprintf("%s:%s", nodeName, DefaultInstorageManagerPort)
+	// serverAddr := fmt.Sprintf("%s:%s", nodeName, DefaultInstorageManagerPort)
+	serverAddr := "instorage-manager.instorage-system.svc.cluster.local:" + DefaultInstorageManagerPort
 
 	// Create gRPC connection
 	conn, err := grpc.DialContext(ctx, serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
