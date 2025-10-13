@@ -5,7 +5,6 @@ import (
 	instoragev1alpha1 "instorage-operator/pkg/apis/v1alpha1"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -216,9 +215,9 @@ func (r *InstorageJobReconciler) validateDataLocations(config *instoragev1alpha1
 	}
 
 	validStrategies := map[string]bool{
-		"co-locate":   true,
-		"fan-out":     true,
-		"replicated":  true,
+		"co-locate":  true,
+		"fan-out":    true,
+		"replicated": true,
 	}
 
 	if config.Strategy != "" && !validStrategies[config.Strategy] {
@@ -242,15 +241,8 @@ func (r *InstorageJobReconciler) validateDataLocations(config *instoragev1alpha1
 
 // validateCSDConfig validates CSD configuration
 func (r *InstorageJobReconciler) validateCSDConfig(config *instoragev1alpha1.CSDConfig) error {
-	// devicePath is optional, only validate if provided
-	if config.DevicePath != "" {
-		if !filepath.IsAbs(config.DevicePath) {
-			return fmt.Errorf("devicePath must be an absolute path: %s", config.DevicePath)
-		}
-		// Basic device path validation
-		if !strings.HasPrefix(config.DevicePath, "/dev/") {
-			return fmt.Errorf("devicePath should typically start with /dev/: %s", config.DevicePath)
-		}
+	if config == nil {
+		return nil
 	}
 
 	return nil
