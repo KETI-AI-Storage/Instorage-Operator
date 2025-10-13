@@ -57,7 +57,5 @@ func (r *InstorageJobReconciler) selectCSDNode(job *instoragev1alpha1.InstorageJ
 	selectedNode := nodes.Items[0].Name
 	r.Log.Info("Selected CSD node", "node", selectedNode, "job", job.Name)
 
-	selectedNode = "instorage-manager.instorage-system.svc.cluster.local"
-
 	return selectedNode, nil
 }
