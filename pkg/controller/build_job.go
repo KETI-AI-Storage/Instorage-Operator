@@ -36,16 +36,16 @@ func (r *InstorageJobReconciler) buildStoragePath(originalPath string, csdEnable
 			return originalPath
 		}
 	}
-	
+
 	// Add appropriate prefix
 	prefix := CSDDisabledPathPrefix
 	if csdEnabled {
 		prefix = CSDEnabledPathPrefix
 	}
-	
+
 	// Clean the original path to remove leading slash if present
 	cleanPath := strings.TrimPrefix(originalPath, "/")
-	
+
 	return filepath.Join(prefix, cleanPath)
 }
 
@@ -491,15 +491,20 @@ func (r *InstorageJobReconciler) buildBatchContainer(parentJob *instoragev1alpha
 func (r *InstorageJobReconciler) buildSubmitJobRequest(job *instoragev1alpha1.InstorageJob, nodeName string) *pb.SubmitJobRequest {
 	// Determine if CSD is enabled
 	csdEnabled := job.Spec.CSD != nil && job.Spec.CSD.Enabled
-	
+
 	// Build storage paths with appropriate prefixes
 	dataPath := r.buildStoragePath(job.Spec.DataPath, csdEnabled)
 	outputPath := r.buildStoragePath(job.Spec.OutputPath, csdEnabled)
-	
+
+	namespace := job.Namespace
+	if namespace == "" {
+		namespace = "default"
+	}
+
 	request := &pb.SubmitJobRequest{
 		JobId:           string(job.UID),
 		JobName:         job.Name,
-		Namespace:       job.Namespace,
+		Namespace:       namespace,
 		Image:           job.Spec.Image,
 		ImagePullPolicy: string(job.Spec.ImagePullPolicy),
 		DataPath:        dataPath,
@@ -596,8 +601,7 @@ func (r *InstorageJobReconciler) buildSubmitJobRequest(job *instoragev1alpha1.In
 	// Add CSD configuration if specified
 	if job.Spec.CSD != nil {
 		request.Csd = &pb.CSDConfig{
-			Enabled:    job.Spec.CSD.Enabled,
-			DevicePath: job.Spec.CSD.DevicePath,
+			Enabled: job.Spec.CSD.Enabled,
 		}
 	}
 
