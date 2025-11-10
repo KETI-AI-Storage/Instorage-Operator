@@ -25,10 +25,10 @@ spec:
   csd:
     enabled: true
 
-  # 선택: 데이터 위치 힌트
+  # 선택: 데이터 위치 힌트 - 나중엔 메타 데이터로 관리
   dataLocations:
     strategy: co-locate
-    locations: ["csd3"]
+    locations: ["csd1"]
 
   # 리소스 (필요시 조절)
   resources:

@@ -381,6 +381,18 @@ spec:
                   exponentialBackoff:
                     type: boolean
                     default: true
+
+              # env 설정할 수 있도록 규칙 정의
+              env: 
+                  type: array 
+                  items: 
+                    type: object
+                    properties:
+                      name: 
+                        type: string 
+                      value:
+                        type: string
+                    required: ["name", "value"]
               
           status:
             type: object

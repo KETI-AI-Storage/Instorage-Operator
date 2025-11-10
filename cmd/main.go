@@ -30,7 +30,7 @@ func init() {
 
 func main() {
 	var probeAddr string
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":40101", "The address the probe endpoint binds to.")
 	// var metricsAddr string
 	// flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 

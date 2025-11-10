@@ -24,6 +24,6 @@ RUN chmod +x ${OPERATOR}
 USER ${USER_UID}
 
 # Expose health probe port
-EXPOSE 8081
+EXPOSE 40101
 
 ENTRYPOINT ["/usr/local/bin/instorage-operator"]
